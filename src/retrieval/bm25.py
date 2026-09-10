@@ -14,33 +14,48 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-with open(ARTICLES_PATH, "r", encoding="utf-8") as f:
-    articles = json.load(f)
+def load_articles():
+    with open(ARTICLES_PATH, "r", encoding="utf-8") as f:
+        articles = json.load(f)
+    # Filter empty/repealed articles to match dense.py's indexed set
+    # (472 total, 12 empty -> 460) so BM25 and dense are ranking over
+    # the exact same pool before fusion.
+    non_empty = [a for a in articles if a["text"].strip()]
+    return non_empty
 
-print(f"Loaded {len(articles)} articles")
 
-# Build the corpus: tokenize each article's text
-corpus_tokens = [tokenize(a["text"]) for a in articles]
+def build_bm25_index(articles):
+    corpus_tokens = [tokenize(a["text"]) for a in articles]
+    return BM25Okapi(corpus_tokens)
 
-bm25 = BM25Okapi(corpus_tokens)
 
-print("BM25 index built.")
-
-# --- Smoke test ---
-test_queries = [
-    "licenciement pour faute grave",
-    "congé de maternité",
-    "durée du travail heures supplémentaires",
-]
-
-for query in test_queries:
+def search(query, bm25_index, articles, k=5):
     query_tokens = tokenize(query)
-    scores = bm25.get_scores(query_tokens)
-    top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:3]
-
-    print(f"\n{'='*60}")
-    print(f"Query: {query!r}")
-    print(f"{'='*60}")
+    scores = bm25_index.get_scores(query_tokens)
+    top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:k]
+    hits = []
     for idx in top_indices:
         a = articles[idx]
-        print(f"  Article {a['article_id']} (score={scores[idx]:.2f}): {a['text'][:100]}...")
+        hits.append({"article_id": a["article_id"], "text": a["text"], "score": scores[idx]})
+    return hits
+
+
+if __name__ == "__main__":
+    articles = load_articles()
+    print(f"Loaded {len(articles)} articles")
+
+    bm25_index = build_bm25_index(articles)
+    print("BM25 index built.")
+
+    test_queries = [
+        "licenciement pour faute grave",
+        "congé de maternité",
+        "durée du travail heures supplémentaires",
+    ]
+
+    for query in test_queries:
+        print(f"\n{'='*60}")
+        print(f"Query: {query!r}")
+        print(f"{'='*60}")
+        for hit in search(query, bm25_index, articles, k=3):
+            print(f"  Article {hit['article_id']} (score={hit['score']:.2f}): {hit['text'][:100]}...")
