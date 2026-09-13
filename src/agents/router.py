@@ -6,8 +6,7 @@ from groq import Groq
 from pydantic import BaseModel, ValidationError
 from typing import Literal
 
-# Confirm this model name is still current in your Groq console before relying on it —
-# Groq periodically deprecates/renames models.
+
 MODEL_NAME = "openai/gpt-oss-20b"
 
 client = Groq()  # reads GROQ_API_KEY from environment

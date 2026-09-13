@@ -52,8 +52,9 @@ def embed_entries(entries, model):
     return dense_vecs
 
 
-def build_index(entries, dense_vecs):
-    client = chromadb.PersistentClient(path=str(CHROMA_PATH))
+def build_index(entries, dense_vecs, client=None):
+    if client is None:
+        client = chromadb.PersistentClient(path=str(CHROMA_PATH))
 
     try:
         client.delete_collection(COLLECTION_NAME)
