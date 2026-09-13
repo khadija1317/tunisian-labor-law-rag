@@ -6,7 +6,7 @@ candidate pool.
 
 from FlagEmbedding import FlagReranker
 import time
-
+from src.retrieval.fusion import fused_search
 def build_reranker():
     return FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=False)
 
