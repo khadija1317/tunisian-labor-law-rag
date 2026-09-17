@@ -7,10 +7,13 @@ ARTICLES_PATH = "data/processed/code_du_travail_articles.json"
 
 def tokenize(text: str) -> list[str]:
     """Simple French-aware tokenizer: lowercase, split on non-alphanumeric
-    (keeps accented chars), treats apostrophes as word boundaries."""
+    (keeps accented chars and digits), treats apostrophes as word
+    boundaries. Digits matter here: article numbers, durations (48 heures),
+    percentages, and thresholds carry real legal meaning in this corpus --
+    dropping them silently made BM25 blind to every numeric query."""
     text = text.lower()
-    text = text.replace("’", "'")  # normalize curly apostrophe to straight
-    tokens = re.findall(r"[a-zàâäéèêëïîôöùûüç]+", text)
+    text = text.replace("’", "'")
+    tokens = re.findall(r"[a-zàâäéèêëïîôöùûüç0-9]+", text)
     return tokens
 
 

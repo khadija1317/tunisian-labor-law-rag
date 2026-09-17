@@ -6,6 +6,7 @@ from groq import Groq
 from pydantic import BaseModel, ValidationError
 from typing import Literal
 
+from src.agents.errors import LLMCallError
 
 MODEL_NAME = "openai/gpt-oss-20b"
 
@@ -28,6 +29,7 @@ Réponds UNIQUEMENT avec un objet JSON de la forme {"label": "..."}, où la vale
 
 
 def route_query(query: str, max_attempts: int = 2) -> str:
+    last_error = None
     for attempt in range(max_attempts):
         try:
             response = client.chat.completions.create(
@@ -44,6 +46,7 @@ def route_query(query: str, max_attempts: int = 2) -> str:
             return result.label
         except Exception as e:
             print(f"Attempt {attempt} failed: {e}")
+            last_error = e
             continue
 
-    return "out_of_scope"
+    raise LLMCallError(f"Router failed after {max_attempts} attempts: {last_error!r}")

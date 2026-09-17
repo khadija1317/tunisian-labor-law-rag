@@ -1,4 +1,4 @@
-f"""
+"""
 Cross-encoder reranking for Corpus 2 (CNSS FAQ), over a fused
 BM25+dense candidate pool. Reuses build_reranker() from rerank.py
 since the cross-encoder itself isn't corpus-specific.

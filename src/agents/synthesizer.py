@@ -8,7 +8,7 @@ verifier can check citations against what was actually retrieved.
 
 from dotenv import load_dotenv
 load_dotenv()
-
+from src.agents.errors import LLMCallError
 from groq import Groq
 from pydantic import BaseModel, ValidationError
 from typing import List
@@ -54,6 +54,7 @@ def synthesize(query: str, retrieved_results, corpus_type: str, max_attempts: in
     context_text = _format_context(retrieved_results, corpus_type)
     user_message = f"Extraits disponibles :\n{context_text}\n\nQuestion : {query}"
 
+    last_error = None
     for attempt in range(max_attempts):
         try:
             response = client.chat.completions.create(
@@ -69,12 +70,13 @@ def synthesize(query: str, retrieved_results, corpus_type: str, max_attempts: in
             return SynthesizerOutput.model_validate_json(raw)
         except Exception as e:
             print(f"Attempt {attempt} failed: {e}")
+            last_error = e
             continue
 
-    return SynthesizerOutput(
-        answer="Une erreur est survenue lors de la génération de la réponse.",
-        citations=[],
-    )
+    raise LLMCallError(f"Synthesizer failed after {max_attempts} attempts: {last_error!r}")
+
+ 
+    
 
 
 if __name__ == "__main__":

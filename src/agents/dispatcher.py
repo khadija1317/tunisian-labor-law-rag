@@ -8,26 +8,28 @@ from src.agents import setup
 from src.agents.router import route_query
 from src.agents.synthesizer import synthesize, SynthesizerOutput
 from src.agents.verifier import verify_answer
+from src.agents.errors import LLMCallError
 
 from src.retrieval.rerank import retrieve as retrieve_labor_code
 from src.retrieval.cnss_rerank import retrieve as retrieve_cnss
 
-# Low-floor sanity check: below this, treat as "nothing relevant in this
-# corpus" and skip synthesis entirely. NOT a confidence/quality threshold
-# (Day 6 finding: rerank scores swing widely -- 0.049 to 0.84 -- across
-# two equally *correct* labor_code queries, so no single cutoff can mean
-# "good answer"). This floor only catches the much larger gap between
-# "nothing relevant at all" (~0.001, per out_of_scope tests) and "at
-# least something topically plausible" (~0.05+).
-# NOTE: CNSS floor is a placeholder -- CNSS scores run much lower overall
-# in every test so far, even on genuine-seeming queries. Revisit once
-# tested against confirmed in-scope CNSS queries specifically.
+
 LABOR_CODE_FLOOR = 0.01
 CNSS_FLOOR = 0.001
 
+API_ERROR_ANSWER = "Une erreur technique est survenue. Merci de réessayer."
+
 
 def handle_query(query: str):
-    label = route_query(query)
+    try:
+        label = route_query(query)
+    except LLMCallError as e:
+        return {
+            "query": query, "label": None, "status": "api_error",
+            "final_answer": API_ERROR_ANSWER,
+            "citations": [], "grounded": None, "flagged_claims": [],
+            "reasoning": f"router: {e}", "top_score": None,
+        }
 
     if label == "out_of_scope":
         return {
@@ -61,8 +63,36 @@ def handle_query(query: str):
             "top_score": top_score,
         }
 
-    synth_output = synthesize(query, results, corpus_type=label)
-    verdict = verify_answer(query, synth_output, results, corpus_type=label)
+    try:
+        synth_output = synthesize(query, results, corpus_type=label)
+    except LLMCallError as e:
+        return {
+            "query": query, "label": label, "status": "api_error",
+            "final_answer": API_ERROR_ANSWER,
+            "citations": [], "grounded": None, "flagged_claims": [],
+            "reasoning": f"synthesizer: {e}", "top_score": top_score,
+        }
+
+    try:
+        verdict = verify_answer(query, synth_output, results, corpus_type=label)
+    except LLMCallError as e:
+        return {
+            "query": query, "label": label, "status": "api_error",
+            "final_answer": API_ERROR_ANSWER,
+            "citations": synth_output.citations, "grounded": None, "flagged_claims": [],
+            "reasoning": f"verifier: {e}", "top_score": top_score,
+        }
+
+    if not verdict.grounded:
+        return {
+            "query": query, "label": label, "status": "ungrounded",
+            "final_answer": "Nous avons trouvé des informations partiellement pertinentes, mais elles n'étaient pas suffisantes pour garantir une réponse fiable à cette question.",
+            "citations": synth_output.citations,
+            "grounded": verdict.grounded,
+            "flagged_claims": verdict.flagged_claims,
+            "reasoning": verdict.reasoning,
+            "top_score": top_score,
+        }
 
     return {
         "query": query, "label": label, "status": "answered",
@@ -95,15 +125,11 @@ if __name__ == "__main__":
     print("# PART 2: deliberate failure-path tests")
     print("#" * 60)
 
-    # --- Test A: does the low-confidence floor actually fire? ---
-    # Pick a query worded to be maximally vague/unrelated to both
-    # corpora's real content, to see whether top_score drops under floor.
     print(f"\n{'='*60}\nTest A: floor-triggering query\n{'='*60}")
-    result = handle_query("allocation chômage CNSS") # adjust if router misclassifies
+    result = handle_query("allocation chômage CNSS")
     for k, v in result.items():
         print(f"  {k}: {v}")
 
-    # --- Test B: does the verifier actually catch a corrupted answer? ---
     print(f"\n{'='*60}\nTest B: manually corrupted synthesizer output\n{'='*60}")
     query = "congé de maternité"
     results = retrieve_labor_code(
@@ -115,14 +141,11 @@ if __name__ == "__main__":
     print(f"  Real answer: {real_output.answer}")
 
     corrupted_output = SynthesizerOutput(
-    answer=real_output.answer + " Ce congé est également valable pour les employés à temps partiel sans réduction de salaire.",
-    citations=real_output.citations,
-)   
+        answer=real_output.answer + " Ce congé est également valable pour les employés à temps partiel sans réduction de salaire.",
+        citations=real_output.citations,
+    )
     print("Replace worked:", real_output.answer != corrupted_output.answer)
     print(f"  Corrupted answer: {corrupted_output.answer}")
-
-
-    print("Replace worked:", real_output.answer != corrupted_output.answer)
 
     verdict = verify_answer(query, corrupted_output, results, corpus_type="labor_code")
     print(f"  grounded: {verdict.grounded}  (expect: False)")

@@ -8,7 +8,7 @@ FAQ_PATH = "data/processed/cnss_faq_entries.json"
 def tokenize(text: str) -> list[str]:
     text = text.lower()
     text = text.replace("’", "'")
-    tokens = re.findall(r"[a-zàâäéèêëïîôöùûüç]+", text)
+    tokens = re.findall(r"[a-zàâäéèêëïîôöùûüç0-9]+", text)
     return tokens
 
 

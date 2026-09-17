@@ -10,7 +10,7 @@ the retrieved source text it cited. Two tiers:
 
 from dotenv import load_dotenv
 load_dotenv()
-
+from src.agents.errors import LLMCallError
 from groq import Groq
 from pydantic import BaseModel
 from typing import List
@@ -92,6 +92,7 @@ Réponse générée : {synth_output.answer}
 Sources citées :
 {sources_text}"""
 
+    last_error = None
     for attempt in range(max_attempts):
         try:
             response = client.chat.completions.create(
@@ -107,13 +108,11 @@ Sources citées :
             return VerifierOutput.model_validate_json(raw)
         except Exception as e:
             print(f"Attempt {attempt} failed: {e}")
+            last_error = e
             continue
 
-    return VerifierOutput(
-        grounded=False,
-        flagged_claims=[],
-        reasoning="Erreur lors de la vérification -- traité par précaution comme non vérifié.",
-    )
+    raise LLMCallError(f"Verifier failed after {max_attempts} attempts: {last_error!r}")
+
 
 
 if __name__ == "__main__":
