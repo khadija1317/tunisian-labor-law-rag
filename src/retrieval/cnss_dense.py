@@ -29,8 +29,14 @@ def load_entries():
 
 def embed_entries(entries, model):
     if EMBEDDINGS_CACHE.exists():
-        print(f"Loading cached embeddings from {EMBEDDINGS_CACHE}")
-        return np.load(EMBEDDINGS_CACHE)
+        cached = np.load(EMBEDDINGS_CACHE)
+        if cached.shape[0] == len(entries):
+            print(f"Loading cached embeddings from {EMBEDDINGS_CACHE}")
+            return cached
+        print(
+            f"Cache has {cached.shape[0]} rows but corpus has {len(entries)} "
+            f"entries -- stale cache, re-embedding."
+        )
 
     texts = [entry_search_text(e) for e in entries]
     print(f"Embedding {len(texts)} CNSS entries with bge-m3...")

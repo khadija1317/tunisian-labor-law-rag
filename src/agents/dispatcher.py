@@ -92,6 +92,7 @@ def handle_query(query: str):
             "flagged_claims": verdict.flagged_claims,
             "reasoning": verdict.reasoning,
             "top_score": top_score,
+            "retrieved_results": results,
         }
 
     return {
@@ -102,6 +103,7 @@ def handle_query(query: str):
         "flagged_claims": verdict.flagged_claims,
         "reasoning": verdict.reasoning,
         "top_score": top_score,
+        "retrieved_results": results,
     }
 
 

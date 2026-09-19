@@ -42,7 +42,7 @@ def rerank(query, fused_results, articles_by_id, reranker, top_n=5):
 
 
 def retrieve(query, bm25_index, bm25_articles, dense_collection, dense_model,
-             articles_by_id, reranker, pool=20, rrf_k=15, top_n=5):
+             articles_by_id, reranker, pool=12, rrf_k=15, top_n=5):
 
     fused = fused_search(query, bm25_index, bm25_articles, dense_collection,
                           dense_model, k=rrf_k, pool=pool)

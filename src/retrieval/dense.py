@@ -34,9 +34,23 @@ def embed_articles(articles, model):
     # Cache to disk: bge-m3 on CPU took ~9 min for 460 articles last run.
     # If anything downstream breaks, we re-load instead of re-embedding.
     if EMBEDDINGS_CACHE.exists():
-        print(f"Loading cached embeddings from {EMBEDDINGS_CACHE}")
-        return np.load(EMBEDDINGS_CACHE)
-
+        cached = np.load(EMBEDDINGS_CACHE)
+        if cached.shape[0] == len(articles):
+            print(f"Loading cached embeddings from {EMBEDDINGS_CACHE}")
+            return cached
+        print(
+            f"Cache has {cached.shape[0]} rows but corpus has {len(articles)} "
+            f"articles -- stale cache, re-embedding."
+        )
+    if EMBEDDINGS_CACHE.exists():
+        cached = np.load(EMBEDDINGS_CACHE)
+        if cached.shape[0] == len(articles):
+            print(f"Loading cached embeddings from {EMBEDDINGS_CACHE}")
+            return cached
+        print(
+            f"Cache has {cached.shape[0]} rows but corpus has {len(articles)} "
+            f"articles -- stale cache, re-embedding."
+        )
     texts = [a["text"] for a in articles]
     print(f"Embedding {len(texts)} articles with bge-m3 "
           f"(can take a few minutes on CPU)...")
